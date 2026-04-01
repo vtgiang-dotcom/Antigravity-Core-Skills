@@ -18,6 +18,14 @@ To use these skills with Antigravity:
 2. In your conversation with Antigravity, invoke them by name, e.g., `@[code_review_expert] scan this file`.
 3. The AI will automatically adopt the professional patterns and strict safety protocols defined in these skills.
 
-## 🛡️ Philosophy & Standards
+## 💡 Inspiration: The Claude Code Paradigm
 
-These skills are synthesized from industry best practices and inspired by top-tier autonomous coding assistants. They do not add new binary execution tools, but rather provide strict **cognitive constraints and execution workflows** to ensure the AI modifies code safely, avoids edge cases, and writes production-ready commits.
+This project was born out of deep architectural research into top-tier agentic systems, heavily inspired by the routing, tool safety, and cognitive constraints seen in **Claude Code**. 
+
+While others have attempted to run or port the actual backend engines, **Antigravity Core Skills** takes a different approach: we extracted the *underlying engineering discipline* and transformed it into universal Markdown prompt files. This allows any AI Assistant to adopt Claude Code's rigorous standards—such as 3-phase security audits, stale-read file protection, and strict git safety—completely natively, without needing custom binaries.
+
+## ⚠️ Disclaimer
+
+- This project is an independent synthesis of prompt-engineering techniques and workflows.
+- It **does not** contain any functional source code, proprietary algorithms, or copyrighted material from Anthropic.
+- It is not affiliated with, endorsed by, or maintained by Anthropic.
