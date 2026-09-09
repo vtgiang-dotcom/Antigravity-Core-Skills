@@ -493,7 +493,21 @@ def check_gemini(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> l
     # Skill body content (frontmatter-agnostic — see check_skill_content docstring)
     issues.extend(check_skill_content(src, dst_skills, ".gemini/antigravity"))
 
+    # Antigravity native discovery: .agents/skills (if present, must resolve to skills)
+    agents_skills = ROOT / ".agents" / "skills"
+    if agents_skills.exists():
+        if not agents_skills.is_dir():
+            issues.append(".agents/skills exists but is not a directory or junction")
+        else:
+            try:
+                count = sum(1 for p in agents_skills.iterdir() if p.is_dir() and (p / "SKILL.md").exists())
+                if count == 0:
+                    issues.append(".agents/skills contains no valid skills")
+            except OSError as err:
+                issues.append(f".agents/skills is broken: {err}")
+
     return issues
+
 
 
 def check_opencode(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> list[str]:
