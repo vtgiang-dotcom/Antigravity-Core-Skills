@@ -47,3 +47,6 @@ Thumbs.db
 !.vscode/mcp.json
 .idea/
 deepseek-harness-master/
+
+# Antigravity IDE custom root junction (mirrors .gemini/antigravity/skills locally)
+/.agents/skills/
