@@ -1524,19 +1524,7 @@ def main() -> int:
 
     print(f"\nTotal drift issues: {len(all_issues)}")
     if all_issues:
-        # generate_harness.py only emits the .claude/ engine; .copilot/ and
-        # .gemini/ are hand-mirrored, so pointing at it for their content
-        # drift sends the user into a loop where the command changes nothing.
-        manual = [
-            i for i in all_issues
-            if i.startswith("Content drift:") and (".copilot" in i or ".gemini" in i)
-        ]
-        if manual:
-            print("Manual resync needed (generate_harness.py does not emit these engines):")
-            print("  copy the body of .kilo/skill/<name>/SKILL.md over the destination file,")
-            print("  keeping the destination's own frontmatter.")
-        if len(manual) < len(all_issues):
-            print("Run 'python tools/generate_harness.py --harness all' to fix the rest.")
+        print("Run 'python tools/generate_harness.py --harness all' to fix drift.")
         return 1
     print("Garden is clean — no drift detected.")
     return 0

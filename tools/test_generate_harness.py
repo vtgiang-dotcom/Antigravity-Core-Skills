@@ -178,3 +178,80 @@ def test_memory_md_is_under_the_hard_cap():
             continue
         n = len(f.read_text(encoding="utf-8"))
         assert n < 8000, f"{engine}/memory/MEMORY.md is {n} chars (hard cap 8000)"
+
+
+# ─── skill body mirrors ──────────────────────────────────────────────────────
+
+SKILL_MIRRORS = [
+    (".copilot", Path(".copilot") / "skill"),
+    (".gemini/antigravity", Path(".gemini") / "antigravity" / "skills"),
+]
+
+
+def _fake_skill_tree(tmp_path: Path) -> Path:
+    _write(
+        tmp_path / ".kilo" / "skill" / "plan" / "SKILL.md",
+        "---\ndescription: Kilo plan\n---\n# Plan\nCommon instruction body.\n",
+    )
+    _write(
+        tmp_path / ".copilot" / "skill" / "plan" / "SKILL.md",
+        '---\ndescription: "Copilot plan"\nlicense: MIT\n---\n# Plan\nCommon instruction body.\n',
+    )
+    _write(
+        tmp_path / ".gemini" / "antigravity" / "skills" / "plan" / "SKILL.md",
+        "---\ndescription: Gemini plan\n---\n# Plan\nCommon instruction body.\n",
+    )
+    return tmp_path
+
+
+def test_skill_body_sync_repairs_drift(tmp_path):
+    root = _fake_skill_tree(tmp_path)
+    # Introduce drift in body of mirrors
+    _write(
+        root / ".copilot" / "skill" / "plan" / "SKILL.md",
+        '---\ndescription: "Copilot plan"\nlicense: MIT\n---\n# Plan\nDRIFTED body.\n',
+    )
+    _write(
+        root / ".gemini" / "antigravity" / "skills" / "plan" / "SKILL.md",
+        "---\ndescription: Gemini plan\n---\n# Plan\nDRIFTED body.\n",
+    )
+
+    synced = generate_harness.sync_skill_body_mirrors(root / ".kilo", root)
+    assert synced == len(SKILL_MIRRORS)
+
+    copilot_text = (root / ".copilot" / "skill" / "plan" / "SKILL.md").read_text(encoding="utf-8")
+    assert 'license: MIT' in copilot_text
+    assert "Common instruction body." in copilot_text
+    assert "DRIFTED" not in copilot_text
+
+    gemini_text = (root / ".gemini" / "antigravity" / "skills" / "plan" / "SKILL.md").read_text(encoding="utf-8")
+    assert "Gemini plan" in gemini_text
+    assert "Common instruction body." in gemini_text
+    assert "DRIFTED" not in gemini_text
+
+    for label, rel in SKILL_MIRRORS:
+        assert not garden.check_skill_content(root / ".kilo", root / rel, label)
+
+
+def test_skill_body_sync_is_idempotent(tmp_path):
+    root = _fake_skill_tree(tmp_path)
+    assert generate_harness.sync_skill_body_mirrors(root / ".kilo", root) == 0
+
+
+def test_skill_body_sync_does_not_invent_files(tmp_path):
+    root = _fake_skill_tree(tmp_path)
+    _write(root / ".kilo" / "skill" / "kilo-only" / "SKILL.md", "---\n---\nBody\n")
+    generate_harness.sync_skill_body_mirrors(root / ".kilo", root)
+    for _, rel in SKILL_MIRRORS:
+        assert not (root / rel / "kilo-only").exists()
+
+
+def test_skill_body_sync_skips_absent_mirror_dirs(tmp_path):
+    _write(tmp_path / ".kilo" / "skill" / "a" / "SKILL.md", "---\n---\nBody\n")
+    assert generate_harness.sync_skill_body_mirrors(tmp_path / ".kilo", tmp_path) == 0
+
+
+def test_real_repo_skill_bodies_are_in_sync():
+    for label, rel in SKILL_MIRRORS:
+        issues = garden.check_skill_content(ROOT / ".kilo", ROOT / rel, label)
+        assert not issues, f"{label} skill body drift in repo: {issues}"

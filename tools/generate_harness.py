@@ -5,7 +5,8 @@ Solo-Code Harness Generator — Claude Code + OpenCode engines
 Reads .kilo/ (source of truth) and regenerates .claude/ (agents, skills,
 commands, instructions, memory, CLAUDE.md) plus the .opencode/ engine
 (agents, commands, skills, instructions, opencode.json) and the .copilot/
-and .gemini/antigravity/ instruction mirrors.
+and .gemini/antigravity/ instruction mirrors, plus .copilot/ and
+.gemini/antigravity/ skill body mirrors.
 
 History: this script used to ALSO generate a .opencode/ mirror. OpenCode
 was deprecated in v3.7.0 (100% content-parity mirror of .kilo/, zero unique
@@ -14,13 +15,12 @@ as a first-class primary engine alongside Claude Code: OpenCode v1.18+ has a
 stable native format that Kilo's frontmatter already follows, so the
 transform (tools/opencode_engine.py) is near-identity.
 
-.copilot/ and .gemini/ instruction/ files used to be "manually kept in
-parity with .kilo/ and verified by tools/garden.py". That left garden
-printing "Run 'python tools/generate_harness.py --harness all' to fix"
-for a drift this script could not actually fix — the only real remedy was
-a hand copy. Instructions are a byte-for-byte copy with no per-engine
-transform (see garden.check_instruction_content), so they are now synced
-here and that advice is true.
+.copilot/ and .gemini/ instruction/ files and skill bodies used to be
+"manually kept in parity with .kilo/ and verified by tools/garden.py".
+That left garden printing "Run 'python tools/generate_harness.py --harness all' to fix"
+for drifts this script could not actually fix. Instructions are byte-for-byte
+copies, and skill bodies are frontmatter-preserving copies from .kilo/skill/,
+so both are now synced here and garden's advice holds true.
 
 Usage:
     python tools/generate_harness.py --harness claude
@@ -80,7 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["all", "claude", "opencode"],
         default="all",
         help="Which engine to generate. 'all' emits claude + opencode + the "
-             ".copilot/.gemini instruction mirrors.",
+             ".copilot/.gemini instruction and skill body mirrors.",
     )
     parser.add_argument(
         "--include-all",
@@ -154,6 +154,62 @@ def sync_memory_mirrors(kilo_root: Path, root: Path) -> int:
     return synced
 
 
+def _split_frontmatter(text: str) -> tuple[str, str]:
+    """Split a markdown file into (frontmatter incl. delimiters, body). Returns
+    ("", text) if there's no `---`-delimited frontmatter block."""
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end != -1:
+            return text[: end + 5], text[end + 5 :]
+    return "", text
+
+
+def sync_skill_body_mirrors(kilo_root: Path, root: Path) -> int:
+    """Sync skill body content from .kilo/skill/ to .copilot/ and .gemini/ mirrors.
+
+    Frontmatter is preserved per engine (Copilot and Gemini require different
+    frontmatter fields than Kilo); only the instruction body after the '---'
+    frontmatter block is synced.
+    Only updates skills that already exist in the destination mirror directory.
+    """
+    src_dir = kilo_root / "skill"
+    if not src_dir.is_dir():
+        return 0
+
+    mirrors = [
+        root / ".copilot" / "skill",
+        root / ".gemini" / "antigravity" / "skills",
+    ]
+
+    synced = 0
+    for dst_skill_dir in mirrors:
+        if not dst_skill_dir.is_dir():
+            continue
+        label = dst_skill_dir.relative_to(root).as_posix()
+        for skill_dir in sorted(p for p in src_dir.iterdir() if p.is_dir()):
+            src_skill_md = skill_dir / "SKILL.md"
+            dst_skill_md = dst_skill_dir / skill_dir.name / "SKILL.md"
+            if not (src_skill_md.is_file() and dst_skill_md.is_file()):
+                continue
+
+            src_text = src_skill_md.read_text(encoding="utf-8")
+            dst_text = dst_skill_md.read_text(encoding="utf-8")
+
+            _, src_body = _split_frontmatter(src_text)
+            dst_fm, dst_body = _split_frontmatter(dst_text)
+
+            if src_body == dst_body:
+                continue
+
+            new_text = dst_fm + src_body
+            dst_skill_md.write_text(new_text, encoding="utf-8")
+            print(f"  [SYNC] {label}/{skill_dir.name}/SKILL.md (body)")
+            synced += 1
+
+    print(f"Skill body mirrors synced: {synced}")
+    return synced
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -179,6 +235,8 @@ def main() -> int:
     sync_instruction_mirrors(kilo_root, ROOT_DIR)
     print("\n--- Memory mirrors (.copilot) ---")
     sync_memory_mirrors(kilo_root, ROOT_DIR)
+    print("\n--- Skill body mirrors (.copilot, .gemini) ---")
+    sync_skill_body_mirrors(kilo_root, ROOT_DIR)
     return rc
 
 
