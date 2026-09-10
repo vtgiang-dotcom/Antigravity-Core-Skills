@@ -32,6 +32,19 @@
       "DROP TABLE*": "deny",
       "DROP DATABASE*": "deny"
     },
-    "external_directory": "ask"
+    "external_directory": "ask",
+    "skill": {
+      "*": "allow",
+      "ci-cd-and-automation": "ask",
+      "permission-guard": "ask",
+      "plan": "ask",
+      "planning-and-task-breakdown": "ask",
+      "requesting-code-review": "ask",
+      "shipping-and-launch": "ask",
+      "spec-driven-development": "ask",
+      "subagent-driven-development": "ask",
+      "task-delegation": "ask",
+      "wayfinder": "ask"
+    }
   }
 }

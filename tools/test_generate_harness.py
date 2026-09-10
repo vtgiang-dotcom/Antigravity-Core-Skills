@@ -19,6 +19,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -26,7 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from tools import garden, generate_harness  # noqa: E402
+from tools import garden, generate_harness, opencode_engine  # noqa: E402
 
 MIRRORS = [
     (".copilot", Path(".copilot") / "instruction"),
@@ -255,3 +256,51 @@ def test_real_repo_skill_bodies_are_in_sync():
     for label, rel in SKILL_MIRRORS:
         issues = garden.check_skill_content(ROOT / ".kilo", ROOT / rel, label)
         assert not issues, f"{label} skill body drift in repo: {issues}"
+
+
+# ─── opencode engine: disabled-skill permission mapping ──────────────────────
+#
+# OpenCode ignores Claude's `disable-model-invocation` field, so a skill meant
+# to be user-invoked only would otherwise become silently model-invocable. The
+# generator maps that flag to `permission.skill[name] = "ask"`.
+
+_DISABLED_SKILL_MD = (
+    "---\nname: guard\ndescription: x\ndisable-model-invocation: true\n---\nbody\n"
+)
+
+
+def test_collect_disabled_skills_reads_flag(tmp_path):
+    _write(tmp_path / ".kilo" / "skill" / "guard" / "SKILL.md", _DISABLED_SKILL_MD)
+    _write(
+        tmp_path / ".kilo" / "skill" / "open" / "SKILL.md",
+        "---\nname: open\ndescription: y\n---\nbody\n",
+    )
+    assert opencode_engine.collect_disabled_skills(tmp_path / ".kilo") == {"guard": "ask"}
+
+
+def test_collect_disabled_skills_ignores_false_and_absent(tmp_path):
+    _write(
+        tmp_path / ".kilo" / "skill" / "a" / "SKILL.md",
+        "---\ndescription: x\ndisable-model-invocation: false\n---\nbody\n",
+    )
+    assert opencode_engine.collect_disabled_skills(tmp_path / ".kilo") == {}
+
+
+def test_generated_opencode_json_gates_disabled_skills(tmp_path):
+    kilo = tmp_path / ".kilo"
+    _write(kilo / "skill" / "guard" / "SKILL.md", _DISABLED_SKILL_MD)
+    disabled = opencode_engine.collect_disabled_skills(kilo)
+
+    opencode_engine.generate_opencode_json(tmp_path / ".opencode", tmp_path, disabled)
+
+    data = json.loads((tmp_path / "opencode.json").read_text(encoding="utf-8"))
+    assert data["default_agent"] == "solo-code-engineer"
+    assert data["permission"]["skill"]["guard"] == "ask"
+    # "*" is listed first so the specific rule wins (OpenCode: last match wins).
+    assert list(data["permission"]["skill"])[0] == "*"
+
+
+def test_generated_opencode_json_omits_skill_block_without_flags(tmp_path):
+    opencode_engine.generate_opencode_json(tmp_path / ".opencode", tmp_path, {})
+    data = json.loads((tmp_path / "opencode.json").read_text(encoding="utf-8"))
+    assert "skill" not in data["permission"]

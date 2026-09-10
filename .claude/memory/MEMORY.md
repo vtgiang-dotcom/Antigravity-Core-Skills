@@ -83,3 +83,11 @@
   first-class engine (v4.2.0) that was only briefly removed, not current; and
   the `commandcode` model provider is a documented GLOBAL dependency (global
   OpenCode plugin) rather than declared in-repo.
+- [decision] 2026-09-10: OpenCode skill invocation is gated from the source
+  flag. OpenCode ignores Claude's `disable-model-invocation` frontmatter and
+  has no user-only skill invocation, so
+  `opencode_engine.collect_disabled_skills()` reads `.kilo/skill/*/SKILL.md`
+  and emits `permission.skill[name] = "ask"` (with `"*": "allow"` first) in the
+  generated `opencode.json`. 10 skills carry the flag; no tooling previously
+  consumed it. #2 done: deleted the unused `@opencode-ai/plugin` dep from the
+  untracked `.opencode/package.json` + node_modules (local-only).
