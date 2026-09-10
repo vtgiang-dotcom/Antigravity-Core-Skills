@@ -74,27 +74,68 @@ def _stderr(msg: str) -> None:
     print(f"[kilo_cli_delegate] {msg}", file=sys.stderr)
 
 
-def find_kilo_binary() -> str | None:
-    """Find Kilo CLI binary. Check PATH first, then common install locations."""
-    # Check PATH
-    kilo_path = shutil.which("kilo")
-    if kilo_path:
-        return kilo_path
+# A Windows npm install puts `kilo.cmd` on PATH. Running it via subprocess
+# expands arguments through batch `%*`, which destroys a multi-line prompt (the
+# guardrail reaches the model truncated or empty). Prefer a real executable.
+_BATCH_SHIM_SUFFIXES = (".cmd", ".bat")
 
-    # Check Antigravity IDE extensions (Windows)
+
+def _is_batch_shim(path: str, *, platform: str | None = None) -> bool:
+    """True if `path` is a Windows `.cmd`/`.bat` shim."""
+    platform = platform or sys.platform
+    return platform == "win32" and Path(path).suffix.lower() in _BATCH_SHIM_SUFFIXES
+
+
+def _real_kilo_candidates() -> list[Path]:
+    """Known real (non-shim) kilo executables, most-preferred first."""
+    candidates: list[Path] = []
     antigravity_base = Path.home() / ".antigravity-ide" / "extensions"
     if antigravity_base.exists():
-        # Find latest version
-        kilo_exts = list(antigravity_base.glob("kilocode.kilo-code-*/bin/kilo.exe"))
-        if kilo_exts:
-            # Sort by version, take latest
-            latest = sorted(kilo_exts, reverse=True)[0]
-            return str(latest)
+        candidates.extend(
+            sorted(antigravity_base.glob("kilocode.kilo-code-*/bin/kilo.exe"), reverse=True)
+        )
+    candidates.append(Path.home() / ".local" / "share" / "kilo" / "bin" / "kilo")
+    return candidates
 
-    # Check ~/.local/share/kilo (Linux/Mac)
-    local_kilo = Path.home() / ".local" / "share" / "kilo" / "bin" / "kilo"
-    if local_kilo.exists():
-        return str(local_kilo)
+
+def _wrapped_executable(shim: str) -> str | None:
+    """Return the real executable an npm `.cmd`/`.bat` shim wraps, if found."""
+    prefix = Path(shim).parent
+    for pattern in (
+        "node_modules/*/bin/kilo.exe",      # npm: node_modules/<pkg>/bin/kilo.exe
+        "node_modules/*/*/bin/kilo.exe",    # npm scoped: node_modules/@scope/<pkg>/...
+        "node_modules/*/bin/kilo",
+        "node_modules/*/*/bin/kilo",
+    ):
+        for candidate in sorted(prefix.glob(pattern)):
+            if candidate.is_file():
+                return str(candidate)
+    return None
+
+
+def find_kilo_binary(*, platform: str | None = None) -> str | None:
+    """Find Kilo CLI binary, preferring a real executable over a batch shim.
+
+    PATH is checked first, but a Windows npm shim (`kilo.cmd`) is not returned
+    as-is: its batch `%*` expansion destroys multi-line arguments. When the PATH
+    hit is a shim, prefer a known real executable, then the exe the shim wraps,
+    and only fall back to the shim itself as a last resort.
+    """
+    platform = platform or sys.platform
+
+    kilo_path = shutil.which("kilo")
+    if kilo_path and not _is_batch_shim(kilo_path, platform=platform):
+        return kilo_path
+
+    for candidate in _real_kilo_candidates():
+        if candidate.is_file():
+            return str(candidate)
+
+    if kilo_path:
+        wrapped = _wrapped_executable(kilo_path)
+        if wrapped:
+            return wrapped
+        return kilo_path
 
     return None
 
