@@ -44,8 +44,9 @@ ROOT = Path(__file__).resolve().parent.parent
 # enough to RUN the AI-CLI harness (agent/skill/command/hook definitions +
 # config). It does NOT need Solo-Code-CLI's own dev docs (CONTRIBUTING,
 # CODE_OF_CONDUCT, SECURITY, SPEC — these describe how to contribute to /
-# rebuild THIS repo, not how to use the harness in a target project) or a
-# deprecated engine (opencode.*). Those stay dev-only, never deployed.
+# rebuild THIS repo, not how to use the harness in a target project).
+# OpenCode is a first-class engine (reintroduced v4.2.0): opencode.json is in
+# ROOT_FILES and .opencode/ is in DIRS_ALL / DIRS_OPENCODE.
 ROOT_FILES = [
     "AGENTS.md",
     "CLAUDE.md",
@@ -159,6 +160,11 @@ DIRS_CLAUDE = [
 
 DIRS_OPENCODE = [
     ".opencode",
+    # OpenCode natively loads the Claude-compatible `.claude/skills/` location
+    # and no longer mirrors skills into `.opencode/skills/` (a second copy
+    # would register every skill twice). Ship that location so an OpenCode-only
+    # deploy still has a skills source.
+    ".claude/skills",
     ".github",
     ".contracts",
     "tools",
@@ -197,7 +203,8 @@ EXCLUDE_FILES = {
     # templates instead (see _write_blank_memory_templates()).
     "MEMORY.md", "project-conventions.md", "harness-design-intent.md",
     "decisions-archive.md",
-    # Deprecated-engine-specific data file (garden.py skip-list for .opencode)
+    # Shared skill skip-list (consumed by both claude_engine and
+    # opencode_engine generation via generate_harness.py) -- dev-only.
     "opencode-skip-skills.txt",
 }
 
@@ -595,10 +602,13 @@ def _write_blank_memory_templates(target: Path, dirs: list[str], dry_run: bool) 
     CLI's own accumulated project memory leak into the target project."""
     written = 0
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    engine_prefixes = {d.split("/")[0] for d in dirs}
+    # Only write memory for engines whose full root is deployed — a partial
+    # path like ".claude/skills" (OpenCode's Claude-compatible skills source)
+    # must not create a stray ".claude/memory/" the engine never reads.
+    deployed_roots = set(dirs)
     for mem_rel in MEMORY_DIRS:
         engine_dir = mem_rel.split("/")[0]
-        if engine_dir not in engine_prefixes:
+        if engine_dir not in deployed_roots:
             continue
         mem_dir = target / mem_rel
         for fname, content in (

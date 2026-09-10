@@ -6,8 +6,9 @@ Checks for stale artifacts, missing generated files, and dead links
 between .kilo/ (source of truth) ↔ .claude/ (generated) and
 .kilo/ ↔ .copilot/ (manually-maintained parity) directories.
 
-.opencode/ was deprecated in v3.7.0 and physically removed in v4.0.0 —
-see .harness.lock and .kilo/memory/MEMORY.md "Decisions" section.
+.opencode/ was removed in v4.0.0, then reintroduced in v4.2.0 as a
+first-class primary engine — see .harness.lock and .kilo/memory/MEMORY.md
+"Decisions" section.
 
 Usage:
     python tools/garden.py
@@ -553,38 +554,36 @@ def check_gemini(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> l
 
 
 
-def check_opencode(src: Path, dst: Path, *, skip_set: set[str] | None = None) -> list[str]:
+def check_opencode(src: Path, dst: Path) -> list[str]:
     """Parity checks for the OpenCode engine (.opencode/).
 
     OpenCode mirrors .kilo/ with near-identity transforms (see
     tools/opencode_engine.py): agents keep their frontmatter except dropped
-    permission keys, commands/instructions/skills are copied verbatim.
+    permission keys, commands/instructions are copied verbatim.
       .kilo/agents      -> .opencode/agents
-      .kilo/skill       -> .opencode/skills   (plural)
       .kilo/command     -> .opencode/commands (plural)
       .kilo/instruction -> .opencode/instruction
+    Skills are NOT mirrored: OpenCode loads both .opencode/skills/ and the
+    Claude-compatible .claude/skills/ and requires unique names, so it relies
+    on .claude/skills/ alone (this check flags a stray .opencode/skills/).
     Plus opencode.json (model default + native permission guard).
     """
     issues: list[str] = []
-    skip_set = skip_set or set()
 
     # Agents (same subdir name; frontmatter drops unknown keys, so name parity only)
     issues.extend(_check_parity_dir(src, dst, ".opencode", "agents"))
 
-    # Skills: .kilo/skill/* dirs must exist in .opencode/skills/*
-    src_skills = src / "skill"
+    # Skills: OpenCode must NOT carry its own mirror. It loads .opencode/skills
+    # AND .claude/skills, and requires unique names, so a stray .opencode/skills
+    # registers every skill twice. OpenCode relies on .claude/skills instead.
     dst_skills = dst / "skills"
-    if src_skills.is_dir():
-        src_names = {p.name for p in src_skills.iterdir() if p.is_dir()} - skip_set
-        dst_names = {p.name for p in dst_skills.iterdir() if p.is_dir()} if dst_skills.is_dir() else set()
-        for name in sorted(src_names - dst_names):
-            issues.append(f"Missing skill: .opencode/skills/{name}/")
-        for name in sorted(dst_names - src_names):
-            issues.append(f"Stale skill (no source): .opencode/skills/{name}/")
-        if dst_skills.is_dir():
-            for entry in sorted(dst_skills.iterdir()):
-                if entry.is_dir() and not (entry / "SKILL.md").exists():
-                    issues.append(f"Skill missing SKILL.md: .opencode/skills/{entry.name}")
+    if dst_skills.exists():
+        issues.append(
+            "Duplicate skills: .opencode/skills exists — OpenCode already loads "
+            ".claude/skills (run 'python tools/generate_harness.py --harness opencode')"
+        )
+    if not (ROOT / ".claude" / "skills").is_dir():
+        issues.append("Missing skills source: .claude/skills (OpenCode-compatible location)")
 
     # Commands: .kilo/command/*.md must exist in .opencode/commands/*.md
     src_cmd = src / "command"
@@ -600,9 +599,6 @@ def check_opencode(src: Path, dst: Path, *, skip_set: set[str] | None = None) ->
     # Instructions (direct copy, same filename + identical content)
     issues.extend(check_instructions(src, dst, ".opencode"))
     issues.extend(check_instruction_content(src, dst, ".opencode"))
-
-    # Skill body content (verbatim copy, so body must match exactly)
-    issues.extend(check_skill_content(src, dst_skills, ".opencode"))
 
     # Static engine config
     if not (ROOT / "opencode.json").exists():
@@ -1451,7 +1447,7 @@ def main() -> int:
 
     # .opencode/ engine — primary agent engine (agents/commands/skills plural)
     print("\n--- .opencode/ ---")
-    opencode_issues = check_opencode(kilo, ROOT / ".opencode", skip_set=skip_skills)
+    opencode_issues = check_opencode(kilo, ROOT / ".opencode")
     if opencode_issues:
         print("[DRIFT] OpenCode engine (.opencode):")
         for i in opencode_issues:

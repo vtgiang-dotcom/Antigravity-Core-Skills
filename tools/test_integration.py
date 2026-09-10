@@ -2,10 +2,11 @@
 """
 Integration tests for Copilot harness structure + shared state.
 
-.opencode/ engine tests (agents/skills/instructions/plugin/state/commands/
-tools/config) were removed in v4.0.0 along with the OpenCode engine itself
--- see .harness.lock. .kilo/ (source of truth) is covered by
-tools/validate_schemas.py + tools/garden.py's drift checks instead.
+.opencode/ engine coverage lives in tools/garden.py's drift checks (see
+check_opencode) and tools/test_generate_harness.py. .kilo/ (source of truth)
+is covered by tools/validate_schemas.py + tools/garden.py's drift checks
+instead. (The OpenCode engine was removed in v4.0.0 and reintroduced in
+v4.2.0 as a first-class primary engine -- see .harness.lock.)
 
 Validates:
   - Copilot: agents, skills, instructions, commands, rulebook, prompts, vscode

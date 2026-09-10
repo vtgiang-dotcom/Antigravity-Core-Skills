@@ -24,7 +24,9 @@ permissions:
 
 > **CRITICAL:** Read this file fully before taking any action. These rules are NON-NEGOTIABLE.
 
-This file serves **Kilo** (reads `.kilo/` for hooks/skills/memory — source of truth), **Claude Code** (reads `.claude/` + `CLAUDE.md`, generated from `.kilo/`), and **GitHub Copilot** (reads `.copilot/` for agents/skills/commands, `.github/copilot-instructions.md` for rulebook). Sections referencing `.kilo/` paths are Kilo-specific; other engines ignore them and use their own generated/mirrored equivalents. (`.opencode/` was deprecated in v3.7.0 and physically removed in v4.0.0 — see `.harness.lock`.)
+This file serves **Kilo** (reads `.kilo/` for hooks/skills/memory — source of truth), **Claude Code** (reads `.claude/` + `CLAUDE.md`, generated from `.kilo/`), **OpenCode** (reads `.opencode/` + `opencode.json`, generated from `.kilo/`; it also loads this file and the Claude-compatible `.claude/skills/` and `.agents/skills/` locations), and **GitHub Copilot** (reads `.copilot/` for agents/skills/commands, `.github/copilot-instructions.md` for rulebook). Sections referencing `.kilo/` paths are Kilo-specific; other engines ignore them and use their own generated/mirrored equivalents. (`.opencode/` was removed in v4.0.0, then reintroduced in v4.2.0 as a first-class primary engine — see `.harness.lock`.)
+
+**OpenCode model provider (global dependency):** `opencode.json` points `model`, `small_model`, and `default_agent` at `commandcode/*`. That provider is not declared in this repo — it comes from the globally installed OpenCode plugin `commandcode-go-opencode-provider` (configured in the user's `~/.config/opencode/opencode.jsonc`) plus the `COMMANDCODE_API_KEY` environment variable. On a machine without that global setup, OpenCode cannot resolve the model and falls back to its built-in `build` agent.
 
 ## Harness Boundaries (READ FIRST)
 
@@ -34,10 +36,10 @@ This project is powered by **Solo-Code Harness** — an AI agent discipline laye
 
 | If the file path starts with... | Then it is... | Action |
 |----------------------------------|---------------|--------|
-| `.kilo/`, `.copilot/`, `.gemini/`, `.claude/`, `.claude-plugin/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
+| `.kilo/`, `.copilot/`, `.gemini/`, `.claude/`, `.claude-plugin/`, `.opencode/`, `.agents/` | Harness engine | Rules/skills/hooks for AI behavior — not project logic |
 | `.contracts/` | Harness sub-agent contracts | Status contracts for delegated agents |
 | `.github/`, `.vscode/`, `tools/` | **Shared** — harness *and* project | The harness ships files here, but the project also keeps its own CI workflows, `CODEOWNERS`, dependabot config, editor settings and dev scripts. Only the exact paths under `[shared_files]` in `.harness.lock` are harness; **everything else here is project code**. |
-| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `claude-env.ps1`, `init.sh`, `verify.sh`, `extensions_config.json`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `CLAUDE.md` | Harness config | Agent behavior configuration — not application config |
+| `AGENTS.md`, `agent.yaml`, `kilo.jsonc`, `opencode.json`, `.mcp.json`, `.ruff.toml`, `.gitleaks.toml`, `Makefile`, `claude-env.ps1`, `init.sh`, `verify.sh`, `extensions_config.json`, `.harness.lock`, `.solocode/`, `.pre-commit-config.yaml`, `.github/pull_request_template.md`, `CLAUDE.md` | Harness config | Agent behavior configuration — not application config |
 | **Everything else** | **Project code** | Your actual application — this is what you modify |
 
 **Key rule:** Never modify harness files to fix a project bug. Never modify project files to fix a harness issue. Read `.harness.lock` for the authoritative boundary list.

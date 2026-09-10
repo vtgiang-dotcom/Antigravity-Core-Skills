@@ -4,16 +4,17 @@ Solo-Code Harness Generator — Claude Code + OpenCode engines
 
 Reads .kilo/ (source of truth) and regenerates .claude/ (agents, skills,
 commands, instructions, memory, CLAUDE.md) plus the .opencode/ engine
-(agents, commands, skills, instructions, opencode.json) and the .copilot/
+(agents, commands, instructions, opencode.json) and the .copilot/
 and .gemini/antigravity/ instruction mirrors, plus .copilot/ and
-.gemini/antigravity/ skill body mirrors.
+.gemini/antigravity/ skill body mirrors. OpenCode gets no skills mirror: it
+loads the Claude-compatible .claude/skills/ natively, so a second copy would
+register every skill twice.
 
-History: this script used to ALSO generate a .opencode/ mirror. OpenCode
-was deprecated in v3.7.0 (100% content-parity mirror of .kilo/, zero unique
-capability) and physically removed in v4.0.0. It is reintroduced (2026-08)
-as a first-class primary engine alongside Claude Code: OpenCode v1.18+ has a
-stable native format that Kilo's frontmatter already follows, so the
-transform (tools/opencode_engine.py) is near-identity.
+History: .opencode/ was deprecated in v3.7.0 (100% content-parity mirror of
+.kilo/, zero unique capability) and physically removed in v4.0.0. It is
+reintroduced (2026-08) as a first-class primary engine alongside Claude Code:
+OpenCode v1.18+ has a stable native format that Kilo's frontmatter already
+follows, so the transform (tools/opencode_engine.py) is near-identity.
 
 .copilot/ and .gemini/ instruction/ files and skill bodies used to be
 "manually kept in parity with .kilo/ and verified by tools/garden.py".

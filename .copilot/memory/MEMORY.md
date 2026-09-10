@@ -11,7 +11,7 @@
 
 ## Tech Stack
 - [tech] Python 3.10+ — tools/ and .github/scripts/ are stdlib-only (zero external deps)
-- [tech] Node.js 18+ — .kilo/hooks/ (Kilo Code hooks), .opencode/plugins/ (guard plugins)
+- [tech] Node.js 18+ — .kilo/hooks/ (Kilo Code hooks). OpenCode uses native `permission` config, no plugin files.
 - [tech] Bash — init.sh, verify.sh, Makefile (Git Bash on Windows)
 - [tech] Ruff — Python linter (config in .ruff.toml, NOT pyproject.toml)
 - [tech] Gitleaks — secret scanner (.gitleaks.toml with allowlist)
@@ -66,6 +66,20 @@
   `native` (full mode, prefer API key or `apiKeyHelper` if present), and
   `kilo` (full-mode alias for IDE-integrated Kilo workflows). This keeps the
   current Claude gateway path stable, avoids touching `COMMANDCODE_*`/`DEEPSEEK_*`, and makes Kilo-specific IDE integrations opt-in
-  instead of overloading one implicit runtime path. `gateway` still restores
+  instead of overloading one implicit runtime path.   `gateway` still restores
   `CLAUDE.md` discovery with `--add-dir .`, but hooks/auto-memory remain a
   documented degraded mode under `--bare`.
+- [decision] 2026-09-10: OpenCode no longer mirrors skills into
+  `.opencode/skills/`. OpenCode natively loads `.opencode/skills/` AND the
+  Claude-compatible `.claude/skills/`, and requires skill names to be unique
+  across loaded locations; mirroring `.kilo/skill` into both registered every
+  skill twice. It now relies on `.claude/skills/` alone;
+  `tools/opencode_engine.prune_duplicate_skills()` removes any legacy
+  `.opencode/skills/`, and `garden.check_opencode()` flags a stray one.
+  `deploy.py --engine opencode` ships `.claude/skills/` (and no longer creates
+  a stray `.claude/memory/`). Lint budget lowered 75->72 (one fewer
+  `mcp-builder/scripts/evaluation.py` copy -> -3 S/BLE findings). Also:
+  AGENTS.md + `harness-boundaries.md` corrected — `.opencode/` is a
+  first-class engine (v4.2.0) that was only briefly removed, not current; and
+  the `commandcode` model provider is a documented GLOBAL dependency (global
+  OpenCode plugin) rather than declared in-repo.
