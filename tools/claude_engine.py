@@ -421,7 +421,7 @@ When ON, a write attempt is blocked (exit 2) with the exact delegation
 command to run instead:
 
 ```bash
-python tools/kilo_cli_delegate.py "<self-contained task naming the file>"
+python tools/opencode_delegate.py "<self-contained task naming the file>" --free
 ```
 
 Then verify the result yourself (read the file back, `git status`/`git diff`)

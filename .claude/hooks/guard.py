@@ -351,8 +351,8 @@ def main() -> int:
             deny(
                 f"executor mode is ON -- the orchestrator does not write files "
                 f"directly. Route this change to a worker:\n"
-                f"  python tools/kilo_cli_delegate.py \"<self-contained task naming "
-                f"{file_path}>\" --with-tools\n"
+                f"  python tools/opencode_delegate.py \"<self-contained task naming "
+                f"{file_path}>\" --free\n"
                 f"Then verify the result yourself (read the file back, run the "
                 f"gates) before accepting it. Note: workers can misreport which "
                 f"path they wrote -- confirm with git status.\n"
