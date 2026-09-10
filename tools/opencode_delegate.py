@@ -70,12 +70,44 @@ def _stderr(msg: str) -> None:
     print(f"[opencode_delegate] {msg}", file=sys.stderr)
 
 
+# npm/bun installs put a `.cmd`/`.bat` shim on PATH. Its `%*` expansion mangles
+# multi-line arguments (the guardrail prompt reaches the model truncated to its
+# first line) and can drop trailing flags like `--format json`. The shim wraps a
+# real executable; prefer that.
+_SHIM_WRAPPED_RELATIVE_PATHS = (
+    Path("node_modules") / "opencode-ai" / "bin" / "opencode.exe",
+    Path("node_modules") / "opencode-ai" / "bin" / "opencode",
+)
+
+
+def _prefer_real_executable(binary: str, *, platform: str | None = None) -> str:
+    """Return the executable a Windows `.cmd`/`.bat` shim wraps, if it exists.
+
+    On Windows `shutil.which("opencode")` usually returns an npm shim
+    (`opencode.cmd`). Running that via subprocess expands arguments through the
+    batch `%*`, which truncates multi-line arguments at the first newline and can
+    drop trailing flags. Pointing at the wrapped executable avoids the shim.
+    Non-Windows and non-shim paths are returned unchanged.
+    """
+    platform = platform or sys.platform
+    if platform != "win32":
+        return binary
+    shim = Path(binary)
+    if shim.suffix.lower() not in (".cmd", ".bat"):
+        return binary
+    for rel in _SHIM_WRAPPED_RELATIVE_PATHS:
+        candidate = shim.parent / rel
+        if candidate.is_file():
+            return str(candidate)
+    return binary
+
+
 def find_opencode_binary() -> str | None:
     """Find OpenCode CLI binary. Check PATH first, then common install locations."""
-    # Check PATH
+    # Check PATH (bypass a Windows npm shim if it wraps a real executable).
     opencode_path = shutil.which("opencode")
     if opencode_path:
-        return opencode_path
+        return _prefer_real_executable(opencode_path)
 
     # Check ~/.opencode/bin (standard install location)
     home_opencode = Path.home() / ".opencode" / "bin" / "opencode"
