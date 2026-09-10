@@ -52,6 +52,8 @@ class SubagentRequest:
     timeout_s: int = 120
     # Extra keyword args passed through to the provider (e.g. --free, --no-guardrail).
     options: dict[str, Any] = field(default_factory=dict)
+    # Capabilities this task needs from the provider (e.g. {"write", "bash"}).
+    capabilities: frozenset[str] = field(default_factory=frozenset)
 
 
 @dataclass
@@ -71,6 +73,9 @@ class SubagentResult:
     summary: str = ""
     evidence: dict[str, Any] = field(default_factory=dict)
     raw_events: list[Any] = field(default_factory=list)
+    # Closed union of why the run stopped: 'completed' | 'scope_exceeded' |
+    # 'timeout' | 'error' | None.
+    stop_reason: str | None = None
 
     @property
     def session_id(self) -> str | None:
@@ -91,7 +96,17 @@ class SubagentRuntime(Protocol):
     Consumer calls ``run(request)`` without importing the provider. This is
     the exact zero-coupling contract from dsh: `agent-loop` never imports
     `shell`; here the orchestrator never imports a specific executor.
+
+    Capability contract: before ``run``, a Consumer MUST verify that
+    ``request.capabilities`` is a subset of ``supported_capabilities()``.
+    If it is not, the Consumer MUST fail loud (raise, or stop and report)
+    rather than run the task anyway and silently drop the missing
+    capability.
     """
+
+    def supported_capabilities(self) -> frozenset[str]:
+        """Return the set of capabilities this provider can satisfy."""
+        ...
 
     def run(self, request: SubagentRequest) -> SubagentResult:
         """Execute one request and return a result.
@@ -107,6 +122,9 @@ class SubagentRuntime(Protocol):
 class _FakeRuntime:
     """A fake provider used only to prove the Protocol is not over-specified."""
 
+    def supported_capabilities(self) -> frozenset[str]:
+        return frozenset({"write"})
+
     def run(self, request: SubagentRequest) -> SubagentResult:
         return SubagentResult(
             ok=True,
@@ -117,6 +135,18 @@ class _FakeRuntime:
                 "exit_code": 0,
             },
         )
+
+
+def check_capabilities(request: SubagentRequest, runtime: SubagentRuntime) -> None:
+    """Fail loud when a request needs a capability the runtime does not have.
+
+    Consumers call this before ``runtime.run(request)``. Running a request
+    whose required capabilities are not a subset of what the provider
+    supports must not silently drop the missing capability — it must raise.
+    """
+    missing = request.capabilities - runtime.supported_capabilities()
+    if missing:
+        raise ValueError(f"runtime lacks required capabilities: {sorted(missing)}")
 
 
 def _self_test() -> None:
@@ -148,6 +178,30 @@ def _self_test() -> None:
 
     # Protocol is runtime-checkable: the fake satisfies it.
     assert isinstance(_FakeRuntime(), SubagentRuntime)
+
+    # Capability gating must fail loud for a missing capability...
+    try:
+        check_capabilities(
+            SubagentRequest(prompt="do X", capabilities=frozenset({"bash"})),
+            _FakeRuntime(),
+        )
+    except ValueError:
+        pass  # expected
+    else:
+        raise AssertionError(
+            "check_capabilities did not raise for unsupported capability"
+        )
+
+    # ...and pass when capabilities are empty or fully supported.
+    check_capabilities(SubagentRequest(prompt="do X"), _FakeRuntime())
+    check_capabilities(
+        SubagentRequest(prompt="do X", capabilities=frozenset({"write"})),
+        _FakeRuntime(),
+    )
+
+    # stop_reason round-trips its closed-union value.
+    exceeded = SubagentResult(ok=False, stop_reason="scope_exceeded")
+    assert exceeded.stop_reason == "scope_exceeded"
 
     print("All tests passed.")
 

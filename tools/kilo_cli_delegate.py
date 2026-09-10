@@ -65,6 +65,8 @@ STRICT OPERATING CONSTRAINTS (must follow, no exceptions):
    only <file list>; no dependencies added" (or state exactly what
    deviated and why).
 
+Your permission scope was frozen when this task was created and cannot be expanded. If you hit a boundary beyond that scope, do not retry or work around it — stop and report exactly what is out of scope so the orchestrator can decide.
+
 """
 
 # ── Helper Functions ─────────────────────────────────────────────────────────
