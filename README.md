@@ -2,9 +2,9 @@
 
 AI coding agent harness — rules, skills, hooks, and verification gates for disciplined Solo-Code engineering.
 
-Engine support: **Kilo Code** (`.kilo/`, source of truth — all other engine artifacts are generated from or kept in parity with it), **Claude Code** (`.claude/` + `CLAUDE.md`, orchestrator, generated from `.kilo/`), **GitHub Copilot** (`.copilot/`, manually kept in parity with `.kilo/`), **Gemini/Antigravity** (`.gemini/`).
+Engine support: **Kilo Code** (`.kilo/`, source of truth — all other engine artifacts are generated from or kept in parity with it), **Claude Code** (`.claude/` + `CLAUDE.md`, orchestrator, generated from `.kilo/`), **OpenCode** (`.opencode/` + `opencode.json`, generated from `.kilo/`, reintroduced in v4.2.0 as a primary engine and worker CLI), **GitHub Copilot** (`.copilot/`, manually kept in parity with `.kilo/`), **Gemini/Antigravity** (`.gemini/`).
 
-> **v4.0.0:** OpenCode engine removed. It was a 100%-parity generated mirror of `.kilo/` (verified via diff — zero content difference in agents/skills) with no unique capability once Claude Code reached full agent/command parity. Full history in `.kilo/memory/MEMORY.md` → "Decisions".
+> **v4.2.0:** OpenCode engine reintroduced as a first-class primary agent engine (removed in v4.0.0 as a 100%-parity mirror with no unique capability, then brought back once OpenCode v1.18+'s stable native format made near-identity regeneration from `.kilo/` cheap). Full history in `.kilo/memory/MEMORY.md` → "Decisions".
 
 ## Quick Start
 
@@ -107,7 +107,7 @@ Cordis or the TypeScript runtime.
 | Module | Role | Ports from |
 |---|---|---|
 | `tools/agent_scope.py` | Scoped tool registry (global + per-agent shadow + dispose) | `core/scope` |
-| `tools/subagent_seam.py` | Subagent Service Definition (`SubagentRequest`/`Result`/`Runtime` Protocol), splits evidence from self-assessment | `subagent` |
+| `tools/subagent_seam.py` | Subagent Service Definition (`SubagentRequest`/`Result`/`Runtime` Protocol), splits evidence from self-assessment, fail-loud capability gating (`capabilities`/`supported_capabilities()`/`check_capabilities()`), closed-union `stop_reason` | `subagent` |
 | `tools/compaction.py` | Byte/char budget policy | `compaction` |
 | `tools/compaction_pruner.py` | Prunes oversized tool results to a byte budget (standalone tool, not a hook) | `compaction-tool-result-pruner` |
 
@@ -292,9 +292,9 @@ Full guide: `.kilo/skill/gemini-delegation/SKILL.md`.
 
 Bộ harness (dây cương) cho AI coding agent — rules, skills, hooks và verification gates dành cho kỹ thuật Solo-Code có kỷ luật.
 
-Hỗ trợ engine: **Kilo Code** (`.kilo/`, nguồn gốc — mọi engine khác được sinh ra từ đây hoặc giữ song song), **Claude Code** (`.claude/` + `CLAUDE.md`, điều phối, sinh từ `.kilo/`), **GitHub Copilot** (`.copilot/`, giữ song song thủ công với `.kilo/`), **Gemini/Antigravity** (`.gemini/`).
+Hỗ trợ engine: **Kilo Code** (`.kilo/`, nguồn gốc — mọi engine khác được sinh ra từ đây hoặc giữ song song), **Claude Code** (`.claude/` + `CLAUDE.md`, điều phối, sinh từ `.kilo/`), **OpenCode** (`.opencode/` + `opencode.json`, sinh từ `.kilo/`, tái bổ sung ở v4.2.0 làm engine chính và worker CLI), **GitHub Copilot** (`.copilot/`, giữ song song thủ công với `.kilo/`), **Gemini/Antigravity** (`.gemini/`).
 
-> **v4.0.0:** đã gỡ engine OpenCode. Nó từng là bản mirror sinh 100% từ `.kilo/` (đã verify bằng diff, không khác biệt nội dung), không còn giá trị riêng khi Claude Code đã đạt parity đầy đủ agent/command. Lịch sử đầy đủ trong `.kilo/memory/MEMORY.md` → "Decisions".
+> **v4.2.0:** tái bổ sung engine OpenCode làm engine chính (đã gỡ ở v4.0.0 vì là bản mirror 100% không có giá trị riêng, sau đó đưa lại khi định dạng native ổn định của OpenCode v1.18+ giúp sinh lại từ `.kilo/` gần như đồng nhất, chi phí thấp). Lịch sử đầy đủ trong `.kilo/memory/MEMORY.md` → "Decisions".
 
 ## Bắt đầu nhanh
 
@@ -396,7 +396,7 @@ theo Cordis hay TypeScript runtime.
 | Module | Vai trò | Port từ |
 |---|---|---|
 | `tools/agent_scope.py` | Scoped tool registry (global + shadow theo agent + dispose) | `core/scope` |
-| `tools/subagent_seam.py` | Service Definition cho subagent (`SubagentRequest`/`Result`/`Runtime` Protocol), tách evidence khỏi self-assessment | `subagent` |
+| `tools/subagent_seam.py` | Service Definition cho subagent (`SubagentRequest`/`Result`/`Runtime` Protocol), tách evidence khỏi self-assessment, fail-loud capability gating (`capabilities`/`supported_capabilities()`/`check_capabilities()`), `stop_reason` closed-union | `subagent` |
 | `tools/compaction.py` | Budget policy theo byte/ký tự | `compaction` |
 | `tools/compaction_pruner.py` | Cắt kết quả tool quá dài theo byte budget (tool độc lập, không phải hook) | `compaction-tool-result-pruner` |
 
