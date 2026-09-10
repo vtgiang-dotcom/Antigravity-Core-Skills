@@ -797,6 +797,21 @@ def _run_command(cmd: list[str], cwd: Path, label: str, dry_run: bool) -> bool:
 # Scaffold mode — create new project from scratch
 # ═══════════════════════════════════════════════════════════════════════
 
+def _print_opencode_skills_note(dirs: list[str]) -> None:
+    """Explain the partial `.claude/` dir that the OpenCode engine ships.
+
+    OpenCode loads the Claude-compatible `.claude/skills/` location natively,
+    so `--engine opencode` ships it. In that case the target's `.claude/` is a
+    skills directory only (no agents/hooks) — say so, so it is not mistaken
+    for a full Claude Code setup.
+    """
+    if ".claude/skills" not in dirs:
+        return
+    print("\n  NOTE: .claude/skills/ ships with the OpenCode engine because OpenCode")
+    print("  loads the Claude-compatible skills location. That makes .claude/ here a")
+    print("  PARTIAL copy (skills only, no agents/hooks) — not a full Claude Code setup.")
+
+
 def scaffold(
     target: str,
     *,
@@ -890,6 +905,8 @@ def scaffold(
 
         if not dry_run:
             print(f"  Copied: {n} new, {u} updated")
+
+    _print_opencode_skills_note(dirs)
 
     # ── Step 2.4: Generate .github/agents/ for Copilot ───────────
     if engine in ("all", "copilot"):
@@ -1284,6 +1301,8 @@ def deploy(
 
         if not dry_run:
             print(f"  Copied: {n} new, {u} updated")
+
+    _print_opencode_skills_note(dirs)
 
     # ── Step 2.4: Generate .github/agents/ for Copilot ───────────
     if engine in ("all", "copilot"):
