@@ -179,32 +179,75 @@ def _split_frontmatter(text: str) -> tuple[str, str]:
 
 
 def check_skill_content(src: Path, dst_skill_dir: Path, dst_label: str) -> list[str]:
-    """Check SKILL.md *body* content matches between .kilo/skill/ and a
-    manually-mirrored engine (dst_skill_dir), ignoring frontmatter.
+    """Check skill directory content matches between .kilo/skill/ and a
+    manually-mirrored engine (dst_skill_dir).
 
-    Frontmatter legitimately differs per engine (e.g. Copilot requires quoted
+    SKILL.md is compared body-only (frontmatter stripped): frontmatter
+    legitimately differs per engine (e.g. Copilot requires quoted
     `description` strings + a `license` field, Kilo doesn't) -- diffing it
-    would be a constant false positive. The body (actual skill instructions)
-    should be byte-identical though; any difference there is real content
-    drift/loss, not an intentional platform adaptation.
+    would be a constant false positive. Every other file in the skill's
+    directory tree (shared/, scripts/, per-language dirs, etc.) is compared
+    byte-for-byte, and missing/extra files between the two sides are
+    reported -- non-SKILL.md files have no frontmatter exemption and any
+    subdirectory drift is real content loss, not an intentional platform
+    adaptation.
     """
     issues: list[str] = []
     src_dir = src / "skill"
     if not src_dir.is_dir() or not dst_skill_dir.is_dir():
         return issues
     for skill_dir in sorted(p for p in src_dir.iterdir() if p.is_dir()):
-        dst_skill_md = dst_skill_dir / skill_dir.name / "SKILL.md"
-        src_skill_md = skill_dir / "SKILL.md"
-        if not (src_skill_md.is_file() and dst_skill_md.is_file()):
+        dst_dir = dst_skill_dir / skill_dir.name
+        if not dst_dir.is_dir():
             continue
-        _, src_body = _split_frontmatter(src_skill_md.read_text(encoding="utf-8"))
-        _, dst_body = _split_frontmatter(dst_skill_md.read_text(encoding="utf-8"))
-        if src_body != dst_body:
+        src_skill_md = skill_dir / "SKILL.md"
+        dst_skill_md = dst_dir / "SKILL.md"
+        if src_skill_md.is_file() and dst_skill_md.is_file():
+            _, src_body = _split_frontmatter(src_skill_md.read_text(encoding="utf-8"))
+            _, dst_body = _split_frontmatter(dst_skill_md.read_text(encoding="utf-8"))
+            if src_body != dst_body:
+                issues.append(
+                    f"Content drift: {dst_label}/{dst_skill_dir.name}/{skill_dir.name}/SKILL.md body "
+                    f"differs from .kilo/skill/{skill_dir.name}/SKILL.md "
+                    "(out of sync — resync body from source of truth, keep dst frontmatter)"
+                )
+        elif src_skill_md.is_file() or dst_skill_md.is_file():
+            continue
+
+        src_rel = {
+            p.relative_to(skill_dir).as_posix()
+            for p in skill_dir.rglob("*")
+            if p.is_file() and p.name != "SKILL.md"
+        }
+        dst_rel = {
+            p.relative_to(dst_dir).as_posix()
+            for p in dst_dir.rglob("*")
+            if p.is_file() and p.name != "SKILL.md"
+        }
+        for rel in sorted(src_rel - dst_rel):
             issues.append(
-                f"Content drift: {dst_label}/{dst_skill_dir.name}/{skill_dir.name}/SKILL.md body "
-                f"differs from .kilo/skill/{skill_dir.name}/SKILL.md "
-                "(out of sync — resync body from source of truth, keep dst frontmatter)"
+                f"Content drift: {dst_label}/{dst_skill_dir.name}/{skill_dir.name}/{rel} "
+                f"is missing (present in .kilo/skill/{skill_dir.name}/{rel})"
             )
+        for rel in sorted(dst_rel - src_rel):
+            issues.append(
+                f"Content drift: {dst_label}/{dst_skill_dir.name}/{skill_dir.name}/{rel} "
+                f"has no counterpart in .kilo/skill/{skill_dir.name}/ (extra/stale file)"
+            )
+        for rel in sorted(src_rel & dst_rel):
+            src_file = skill_dir / rel
+            dst_file = dst_dir / rel
+            try:
+                src_bytes = src_file.read_bytes()
+                dst_bytes = dst_file.read_bytes()
+            except OSError:
+                continue
+            if src_bytes != dst_bytes:
+                issues.append(
+                    f"Content drift: {dst_label}/{dst_skill_dir.name}/{skill_dir.name}/{rel} "
+                    f"differs from .kilo/skill/{skill_dir.name}/{rel} "
+                    "(out of sync — resync from source of truth)"
+                )
     return issues
 
 

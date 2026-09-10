@@ -144,6 +144,55 @@ def test_check_skill_content_reports_the_real_destination_dirname(tmp_path):
     assert ".copilot/skill/wayfinder/SKILL.md" in issue
 
 
+def test_check_skill_content_detects_subdirectory_file_drift(tmp_path):
+    """A stale shared/*.md file (SKILL.md matches, subdirectory doesn't) must
+    be flagged -- this is the exact bug that let 70 lines of drift in
+    claude-api/shared/anthropic-cli.md go undetected."""
+    src, dst = tmp_path / "src", tmp_path / "dst_skill"
+    _write(src / "skill" / "claude-api" / "SKILL.md", "---\n---\nbody\n")
+    _write(src / "skill" / "claude-api" / "shared" / "models.md", "current content\n")
+    _write(dst / "claude-api" / "SKILL.md", "---\n---\nbody\n")
+    _write(dst / "claude-api" / "shared" / "models.md", "stale content\n")
+    issues = garden.check_skill_content(src, dst, ".copilot")
+    assert any("shared/models.md" in i and "Content drift" in i for i in issues)
+
+
+def test_check_skill_content_detects_missing_subdirectory_file(tmp_path):
+    """A file present in .kilo but absent from the mirror must be reported."""
+    src, dst = tmp_path / "src", tmp_path / "dst_skill"
+    _write(src / "skill" / "claude-api" / "SKILL.md", "---\n---\nbody\n")
+    _write(src / "skill" / "claude-api" / "shared" / "new-file.md", "content\n")
+    _write(dst / "claude-api" / "SKILL.md", "---\n---\nbody\n")
+    (dst / "claude-api" / "shared").mkdir(parents=True, exist_ok=True)
+    issues = garden.check_skill_content(src, dst, ".copilot")
+    assert any(
+        "shared/new-file.md" in i and "is missing" in i for i in issues
+    )
+
+
+def test_check_skill_content_detects_extra_stale_subdirectory_file(tmp_path):
+    """A file present in a mirror but absent from .kilo (leftover after a
+    trim) must be reported."""
+    src, dst = tmp_path / "src", tmp_path / "dst_skill"
+    _write(src / "skill" / "claude-api" / "SKILL.md", "---\n---\nbody\n")
+    _write(dst / "claude-api" / "SKILL.md", "---\n---\nbody\n")
+    _write(dst / "claude-api" / "shared" / "leftover.md", "stale\n")
+    issues = garden.check_skill_content(src, dst, ".copilot")
+    assert any(
+        "shared/leftover.md" in i and "no counterpart" in i for i in issues
+    )
+
+
+def test_check_skill_content_ignores_matching_subdirectory_files(tmp_path):
+    """Byte-identical subdirectory files must not be flagged."""
+    src, dst = tmp_path / "src", tmp_path / "dst_skill"
+    _write(src / "skill" / "claude-api" / "SKILL.md", "---\n---\nbody\n")
+    _write(src / "skill" / "claude-api" / "shared" / "models.md", "same\n")
+    _write(dst / "claude-api" / "SKILL.md", "---\n---\nbody\n")
+    _write(dst / "claude-api" / "shared" / "models.md", "same\n")
+    assert garden.check_skill_content(src, dst, ".copilot") == []
+
+
 # ─── _split_frontmatter ──────────────────────────────────────────────────────
 
 def test_split_frontmatter_with_delimiters():
