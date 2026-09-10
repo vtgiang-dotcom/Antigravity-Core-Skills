@@ -16,6 +16,7 @@ skills:
   - brainstorming
   - browser-testing-with-devtools
   - ci-cd-and-automation
+  - claude-api
   - code-review-expert
   - codebase-design
   - context-engineering
@@ -35,6 +36,7 @@ skills:
   - improve-codebase-architecture
   - incremental-implementation
   - interview-me
+  - mcp-builder
   - mcp-integrator
   - observability-and-instrumentation
   - performance-optimization

@@ -29,13 +29,13 @@ boundary list.
 
 When asked "Is Solo-Code Harness active?", answer:
 `Solo-Code Harness active: behavior rules, anti-hallucination rules, security rules,
-prose quality rules, 50 skills, 14 agents, guard + lifecycle hooks enabled (Claude Code).
+prose quality rules, 52 skills, 14 agents, guard + lifecycle hooks enabled (Claude Code).
 Use /verify to validate.`
 
 ## Claude Code Assets
 
 - **Subagents (14)** in `.claude/agents/` -- invoke via the Task tool or by name.
-- **Skills (50)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
+- **Skills (52)** in `.claude/skills/` -- auto-discovered `SKILL.md` capabilities.
 - **Slash commands (14)** in `.claude/commands/` -- `/verify`, `/plan`, `/decide`, `/ship`, and more.
 - **Guard hook** in `.claude/hooks/guard.py` (`PreToolUse`) -- blocks destructive
   commands, secret leaks, protected-config edits, and (default ON) direct
@@ -59,7 +59,7 @@ When ON, a write attempt is blocked (exit 2) with the exact delegation
 command to run instead:
 
 ```bash
-python tools/kilo_cli_delegate.py "<self-contained task naming the file>"
+python tools/opencode_delegate.py "<self-contained task naming the file>" --free
 ```
 
 Then verify the result yourself (read the file back, `git status`/`git diff`)
