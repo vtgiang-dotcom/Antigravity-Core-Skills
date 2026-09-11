@@ -66,6 +66,15 @@ HARNESS_ALLOWED_SPECIAL = {
     "Thumbs.db",
 }
 
+# ─── Data assets allowed only inside a skill directory ───────────────────────
+# A skill may ship data files its own scripts read — mcp-builder's
+# scripts/example_evaluation.xml is one. Scoped to paths under a skill
+# directory: adding ".xml" to HARNESS_ALLOWED_EXTENSIONS would blind the audit
+# to a stray .xml anywhere in a harness dir, which is the leak it exists to
+# catch.
+HARNESS_SKILL_DIR_PARTS = {"skill", "skills"}
+HARNESS_SKILL_ASSET_EXTENSIONS = {".xml"}
+
 # ─── Directories that are always allowed in harness (not counted as project) ─
 HARNESS_KNOWN_SUBDIRS = {
     "node_modules",       # Plugin dependencies
@@ -103,6 +112,12 @@ def should_report(file_path: Path, root: Path, strict: bool = False) -> tuple[bo
         return False, "prompt markdown"
     if suffix == ".lock":
         return False, "lock file"
+
+    # Skill data assets are valid only within a skill directory.
+    if suffix in HARNESS_SKILL_ASSET_EXTENSIONS and (
+        HARNESS_SKILL_DIR_PARTS & set(file_path.parts)
+    ):
+        return False, f"skill data asset ({suffix})"
 
     if suffix in HARNESS_ALLOWED_EXTENSIONS:
         if not strict:
