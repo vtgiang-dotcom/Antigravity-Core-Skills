@@ -36,12 +36,17 @@ Solo-Code is a discipline layer for AI coding agents — rules, skills, hooks, a
 
 ### Development Setup
 
-The harness requires only Python 3.10+ and Node 18+. No additional dependencies beyond stdlib.
+Running the harness needs only Python 3.10+ and Node 18+ — its runtime code is
+stdlib-only. The verification gates need two dev tools, declared in the `dev`
+extra of `pyproject.toml`: `pytest` (tests) and `ruff` (lint).
 
 ```bash
 # Clone
 git clone https://github.com/solo-code-io/solo-code-cli.git
 cd solo-code-cli
+
+# Install dev tools (pytest + ruff) into the interpreter make uses
+python -m pip install -e ".[dev]"
 
 # Run verification gates
 make check
@@ -49,6 +54,11 @@ make check
 # Generate harness artifacts
 make generate
 ```
+
+`make test` and `make check` call `python -m pytest`, so pytest must live in
+whatever interpreter `python` resolves to. An activated virtualenv shadows the
+system Python and hides its packages — if `python -m pytest` reports
+`No module named pytest`, install the dev extra into that virtualenv.
 
 ### Coding Standards
 

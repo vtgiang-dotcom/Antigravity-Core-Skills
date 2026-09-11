@@ -29,6 +29,11 @@ Homepage = "https://github.com/solo-code-io/solo-code-cli"
 Repository = "https://github.com/solo-code-io/solo-code-cli"
 Issues = "https://github.com/solo-code-io/solo-code-cli/issues"
 
+[project.optional-dependencies]
+# Dev-only tools for the verification gates (`make test`, `make check`) and
+# `ruff check`. The harness itself keeps zero runtime dependencies.
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
 [tool.hatch.version]
 source = "vcs"
 fallback-version = "4.2.0"
