@@ -3,31 +3,30 @@
 # File này đánh dấu ranh giới giữa harness infrastructure và code dự án.
 # AI Model: đọc file này trước khi phân tích codebase.
 #
-# MỌI FILE/THƯ MỤC trong [boundaries] là HARNESS — KHÔNG phải code dự án.
+# MỌI FILE/THƯ MỤC trong [boundaries] dirs là HARNESS — KHÔNG phải code dự án.
 # Không sửa, không phân tích như logic nghiệp vụ.
+# .github/, .vscode/, tools/ là thư mục DÙNG CHUNG — chỉ những đường dẫn trong
+# [shared_files] mới là harness; file khác ở đó là CODE DỰ ÁN.
 
 [harness]
 version = "4.2.0"
 source = "solo-code-io/solo-code-cli"
-generated_at = "2026-08-24T00:00:00Z"
+generated_at = "2026-09-11T00:00:00Z"
 
 # --- ENGINE STATUS (v4.2.0) ---
-# .opencode/  -> REINTRODUCED as a first-class primary agent engine (2026-08).
-#                Removed in v4.0.0 as a 100%-parity mirror with no unique
-#                capability; OpenCode v1.18+ has a stable native format that
-#                Kilo's frontmatter already follows, so tools/opencode_engine.py
-#                regenerates it near-identity. opencode.json carries the model
-#                default + native permission guard.
-# jcode       -> Cost/latency-optimized worker engine for scriptable,
-#                high-concurrency sub-tasks (DeepSeek v4 via CommandCode
-#                gateway). No dedicated harness dir needed: reads AGENTS.md,
-#                .claude/skills/ (fallback) and .mcp.json natively. Launcher:
-#                jcode.ps1. Orchestrated by Claude Code (planner).
+# .opencode/  -> first-class primary agent engine (reintroduced 2026-08).
+#                Its native format already follows Kilo's frontmatter, so
+#                tools/opencode_engine.py regenerates it near-identity.
+#                opencode.json carries the model default + native permission
+#                guard.
 # .copilot/   -> NOT auto-generated. Manually kept in parity with .kilo/
 #                (source of truth); verified by tools/garden.py drift checks.
+# jcode       -> RETIRED in v4.1.0. Launcher jcode.ps1 removed; no dedicated
+#                harness dir. Older deploys are cleaned via the
+#                RETIRED_ROOT_FILES entry in tools/deploy.py.
 
 [boundaries]
-# Thư mục harness — KHÔNG chứa code dự án
+# Thư mục harness — toàn bộ nội dung là harness, KHÔNG chứa code dự án
 dirs = [
     ".kilo",
     ".copilot",
@@ -36,10 +35,95 @@ dirs = [
     ".claude",
     ".claude-plugin",
     ".opencode",
-    ".github",
     ".contracts",
+]
+
+# Thư mục DÙNG CHUNG — harness đặt file vào đây, nhưng dự án CŨNG sở hữu file
+# riêng ở đây (CI workflow, CODEOWNERS, script dev, cấu hình editor...).
+#
+# AI Model: KHÔNG được coi cả thư mục này là harness. Chỉ những đường dẫn
+# liệt kê trong [shared_files] mới là harness; MỌI file khác trong các thư mục
+# này là CODE DỰ ÁN — đọc, phân tích và sửa như bình thường.
+shared_dirs = [
+    ".github",
     ".vscode",
     "tools",
+]
+
+[shared_files]
+# Đường dẫn chính xác của file harness nằm trong shared_dirs. Repo này CHÍNH LÀ
+# harness, nên mọi file được git theo dõi trong ba thư mục trên đều là harness.
+# Một bản deploy sang dự án đích chỉ khai báo tập con thực sự được ship.
+paths = [
+    ".github/copilot-instructions.md",
+    ".github/prompts/commit.prompt.md",
+    ".github/prompts/debug.prompt.md",
+    ".github/prompts/decide.prompt.md",
+    ".github/prompts/plan.prompt.md",
+    ".github/prompts/ship.prompt.md",
+    ".github/prompts/verify.prompt.md",
+    ".github/pull_request_template.md",
+    ".github/scripts/__init__.py",
+    ".github/scripts/boundary_audit.py",
+    ".github/scripts/check_skips.py",
+    ".github/scripts/checklist.py",
+    ".github/scripts/eval_harness.py",
+    ".github/scripts/security-allowlist.txt",
+    ".github/scripts/security_scan.py",
+    ".github/workflows/ci.yml",
+    ".github/workflows/release.yml",
+    ".vscode/mcp.json",
+    ".vscode/settings.json",
+    "tools/__init__.py",
+    "tools/agent_scope.py",
+    "tools/approve_api_key.py",
+    "tools/benchmark_executors.py",
+    "tools/check_lint_budget.py",
+    "tools/claude_engine.py",
+    "tools/compaction.py",
+    "tools/compaction_pruner.py",
+    "tools/config/coverage-budget.json",
+    "tools/config/lint-budget.json",
+    "tools/coverage_gate.py",
+    "tools/deploy.py",
+    "tools/garden.py",
+    "tools/generate_harness.py",
+    "tools/harness_config.py",
+    "tools/kilo_cli_delegate.py",
+    "tools/kilo_server_manager.py",
+    "tools/kilo_usage_report.py",
+    "tools/opencode_delegate.py",
+    "tools/opencode_engine.py",
+    "tools/opencode-skip-skills.txt",
+    "tools/session_analytics.py",
+    "tools/session_persistence.py",
+    "tools/shared_state.py",
+    "tools/shared_state_schema.sql",
+    "tools/snapshot_testing.py",
+    "tools/solocode_config.py",
+    "tools/subagent_seam.py",
+    "tools/test_agent_scope.py",
+    "tools/test_approve_api_key.py",
+    "tools/test_check_lint_budget.py",
+    "tools/test_claude_engine.py",
+    "tools/test_claude_guard.py",
+    "tools/test_claude_hooks.py",
+    "tools/test_deploy.py",
+    "tools/test_e2e.py",
+    "tools/test_garden.py",
+    "tools/test_generate_harness.py",
+    "tools/test_guard.py",
+    "tools/test_integration.py",
+    "tools/test_kilo_cli_delegate.py",
+    "tools/test_kilo_executor_mode.py",
+    "tools/test_opencode_delegate.py",
+    "tools/test_secret_patterns.py",
+    "tools/test_session_persistence.py",
+    "tools/test_shared_state.py",
+    "tools/test_snapshot_testing.py",
+    "tools/test_subagent_seam.py",
+    "tools/test_validate_schemas.py",
+    "tools/validate_schemas.py",
 ]
 
 # File gốc harness — KHÔNG phải code dự án
@@ -52,14 +136,14 @@ files = [
     ".mcp.json",
     ".ruff.toml",
     ".gitleaks.toml",
+    "eslint.config.js",
     "Makefile",
     "pyproject.toml",
-    "jcode.ps1",
     "claude-env.ps1",
-    "verify.sh",
     "init.sh",
+    ".env.template",
+    "verify.sh",
     "extensions_config.json",
-    "SPEC.md",
     ".gitignore",
     ".pre-commit-config.yaml",
 ]

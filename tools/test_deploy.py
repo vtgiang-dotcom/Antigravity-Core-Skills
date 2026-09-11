@@ -291,6 +291,73 @@ def test_lock_never_claims_a_project_file(tmp_path):
     assert not overlap, f"lock would claim project-owned files as harness: {overlap}"
 
 
+# ─── the lock TEMPLATE must not drift from the deploy data model ────────────
+#
+# The template is a static string, so nothing tied it to ROOT_FILES /
+# EXCLUSIVE_HARNESS_DIRS / SHARED_DIRS. It silently fell behind: .opencode
+# (a whole first-class engine dir) was missing from `dirs`, and opencode.json,
+# eslint.config.js and .env.template were missing from `files` -- so every
+# deployed lock told the model those were project code it could edit.
+
+def _parse_template_list(template: str, key: str) -> list[str]:
+    import re
+    m = re.search(rf"^{key} = \[(.*?)\]$", template, re.MULTILINE | re.DOTALL)
+    assert m, f"lock template has no top-level {key} = [...] block"
+    return re.findall(r'"([^"]+)"', m.group(1))
+
+
+def test_lock_template_owned_dirs_match_exclusive_dirs():
+    declared = set(_parse_template_list(deploy.HARNESS_LOCK_TEMPLATE, "dirs"))
+    assert declared == deploy.EXCLUSIVE_HARNESS_DIRS, (
+        f"lock template dirs drifted: "
+        f"missing={deploy.EXCLUSIVE_HARNESS_DIRS - declared}, "
+        f"phantom={declared - deploy.EXCLUSIVE_HARNESS_DIRS}"
+    )
+
+
+def test_lock_template_shared_dirs_match_shared_dirs():
+    declared = set(_parse_template_list(deploy.HARNESS_LOCK_TEMPLATE, "shared_dirs"))
+    assert declared == deploy.SHARED_DIRS
+
+
+def test_lock_template_root_files_match_root_files():
+    declared = set(_parse_template_list(deploy.HARNESS_LOCK_TEMPLATE, "files"))
+    assert declared == set(deploy.ROOT_FILES), (
+        f"lock template files drifted from ROOT_FILES: "
+        f"missing={set(deploy.ROOT_FILES) - declared}, "
+        f"phantom={declared - set(deploy.ROOT_FILES)}"
+    )
+
+
+def test_root_lock_version_matches_pyproject_fallback():
+    """The committed lock must carry the version deploy will stamp.
+
+    pyproject fallback-version was left at 4.1.0 while agent.yaml moved to
+    4.2.0, so every deploy shipped a lock that garden.py immediately flagged
+    as drift against agent.yaml.
+    """
+    lock = (deploy.ROOT / ".harness.lock").read_text(encoding="utf-8")
+    lock_version = ""
+    for line in lock.splitlines():
+        s = line.strip()
+        if s.startswith("version"):
+            lock_version = s.split("=", 1)[1].strip().strip('"')
+            break
+
+    pyproject = (deploy.ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    fallback = ""
+    for line in pyproject.splitlines():
+        if line.strip().startswith("fallback-version"):
+            fallback = line.split("=", 1)[1].strip().strip('"')
+            break
+
+    assert lock_version and fallback, "missing version in lock or pyproject"
+    assert lock_version == fallback, (
+        f"root .harness.lock version {lock_version!r} != pyproject "
+        f"fallback-version {fallback!r}"
+    )
+
+
 def test_harness_test_files_are_never_deployed(tmp_path):
     """tools/test_*.py test THIS repo, not the target project.
 
