@@ -6,7 +6,7 @@ $claudeArgs = @($args)
 # - native: native Claude Code mode; prefers API key if present, otherwise lets
 #   Claude Code use its normal auth flow.
 # - kilo: same runtime behavior as native, but keeps a distinct profile name so
-#   IDE integrations can target it explicitly without changing Claude/jcode.
+#   IDE integrations can target it explicitly without changing the default profile.
 #
 # Bare mode (--bare), when explicitly requested:
 # skips hooks, skill-dir discovery, LSP, plugin sync, attribution,

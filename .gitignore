@@ -17,6 +17,9 @@ tools/_version.py
 # Node
 node_modules/
 
+# OpenCode local plugin-list config — the real config is /opencode.json
+.opencode/opencode.json
+
 # Environment secrets
 .env
 .env.*
