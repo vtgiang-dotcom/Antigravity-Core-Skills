@@ -221,9 +221,14 @@ python -m pytest tools/test_claude_guard.py tools/test_claude_hooks.py -q
 `claude-env.ps1` loads `.env`, normalizes the gateway URL, and launches Claude Code
 with profile-based behavior:
 
-- `gateway` (default): FreeModel / third-party gateways via `--bare`
-- `native`: full mode, prefer `ANTHROPIC_API_KEY` / `apiKeyHelper` if present
-- `kilo`: full mode alias for IDE-integrated Kilo workflows
+- `gateway` (default): FreeModel / third-party gateways via `ANTHROPIC_API_KEY` + `ANTHROPIC_BASE_URL`
+- `native`: prefer `ANTHROPIC_API_KEY` / `apiKeyHelper` if present
+- `kilo`: distinct profile name for IDE-integrated Kilo workflows
+
+Every profile runs in full mode by default — hooks, skills, auto-memory and
+`CLAUDE.md` auto-discovery are all active. Pass `--bare` explicitly to opt into
+the reduced mode (which re-adds `CLAUDE.md` discovery via `--add-dir .` but
+still skips hooks and auto-memory).
 
 ```powershell
 # 1. Copy the template and fill your key
@@ -242,7 +247,7 @@ Copy-Item .env.template .env
 ```
 
 `.env.template` ships with 3 FreeModel VIP tiers (`cc.freemodel.dev`, `api-cc.freemodel.dev`, `cc-t2.freemodel.dev`)
-alongside a `COMMANDCODE_API_KEY` entry shared with Kilo CLI. Your real `.env` is gitignored and never deployed. The default `gateway` profile restores `CLAUDE.md` discovery with `--add-dir .`, but Claude Code still skips hooks and auto-memory in `--bare` mode.
+alongside a `COMMANDCODE_API_KEY` entry shared with Kilo CLI. Your real `.env` is gitignored and never deployed. Full mode is the default for every profile, so hooks and auto-memory stay active; pass `--bare` explicitly if a future provider swap needs the reduced mode.
 
 ## Gemini/Antigravity Handoff (manual, file-based)
 
