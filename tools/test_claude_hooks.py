@@ -21,7 +21,9 @@ ROOT = Path(__file__).resolve().parent.parent
 HOOKS = ROOT / ".claude" / "hooks"
 
 
-def _run(hook: str, payload: dict | str) -> subprocess.CompletedProcess[str]:
+def _run(
+    hook: str, payload: dict | str, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
     data = payload if isinstance(payload, str) else json.dumps(payload)
     return subprocess.run(
         [sys.executable, str(HOOKS / hook)],
@@ -29,6 +31,7 @@ def _run(hook: str, payload: dict | str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
         timeout=30,
+        cwd=str(cwd) if cwd is not None else None,
     )
 
 
@@ -109,85 +112,68 @@ def test_session_start_empty_stdin_exits_zero():
     assert r.returncode == 0
 
 
-def test_session_start_announces_new_gemini_report(tmp_path, monkeypatch):
-    """A new outbox/*-report.md should be announced once, then go quiet."""
-    outbox = ROOT / ".gemini" / "antigravity" / "handoff" / "outbox"
-    seen_file = ROOT / ".solocode" / "gemini-handoff-seen.json"
-    marker = outbox / "pytest-fixture-report.md"
-    seen_backup = seen_file.read_text(encoding="utf-8") if seen_file.is_file() else None
-    try:
-        marker.write_text("---\nslug: pytest-fixture\n---\ntest\n", encoding="utf-8")
-        if seen_file.is_file():
-            seen_file.unlink()
+def test_session_start_announces_new_gemini_report(tmp_path):
+    """A new outbox/*-report.md should be announced once, then go quiet.
 
-        r1 = _run("session_start.py", {})
-        assert r1.returncode == 0
-        assert "pytest-fixture-report.md" in r1.stdout
+    session_start.py resolves everything relative to Path.cwd(), so this runs
+    against a throwaway cwd. Writing into the repo's real outbox/ made the
+    test race every other test and leave the shared "seen" marker behind.
+    """
+    outbox = tmp_path / ".gemini" / "antigravity" / "handoff" / "outbox"
+    outbox.mkdir(parents=True)
+    (outbox / "pytest-fixture-report.md").write_text(
+        "---\nslug: pytest-fixture\n---\ntest\n", encoding="utf-8"
+    )
 
-        r2 = _run("session_start.py", {})
-        assert r2.returncode == 0
-        assert "pytest-fixture-report.md" not in r2.stdout
-    finally:
-        marker.unlink(missing_ok=True)
-        if seen_backup is not None:
-            seen_file.write_text(seen_backup, encoding="utf-8")
-        elif seen_file.is_file():
-            seen_file.unlink()
+    r1 = _run("session_start.py", {}, cwd=tmp_path)
+    assert r1.returncode == 0
+    assert "pytest-fixture-report.md" in r1.stdout
+
+    r2 = _run("session_start.py", {}, cwd=tmp_path)
+    assert r2.returncode == 0
+    assert "pytest-fixture-report.md" not in r2.stdout
 
 
-def test_session_start_surfaces_and_consumes_checkpoint():
+def test_session_start_surfaces_and_consumes_checkpoint(tmp_path):
     """A pending .solocode/context-checkpoint.json is surfaced once, then
     deleted so it never leaks into a later, unrelated session."""
-    checkpoint_file = ROOT / ".solocode" / "context-checkpoint.json"
-    backup = checkpoint_file.read_text(encoding="utf-8") if checkpoint_file.is_file() else None
-    try:
-        checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint_file.write_text(json.dumps({
-            "active_feature": "pytest-fixture-feature",
-            "unverified_changes": ["tools/example.py"],
-            "settled_decisions": ["use pytest fixture"],
-            "next_immediate_step": "run tests",
-        }), encoding="utf-8")
+    checkpoint_file = tmp_path / ".solocode" / "context-checkpoint.json"
+    checkpoint_file.parent.mkdir(parents=True)
+    checkpoint_file.write_text(json.dumps({
+        "active_feature": "pytest-fixture-feature",
+        "unverified_changes": ["tools/example.py"],
+        "settled_decisions": ["use pytest fixture"],
+        "next_immediate_step": "run tests",
+    }), encoding="utf-8")
 
-        r1 = _run("session_start.py", {})
-        assert r1.returncode == 0
-        assert "pytest-fixture-feature" in r1.stdout
-        assert not checkpoint_file.exists(), "checkpoint must be consumed (deleted) after read"
+    r1 = _run("session_start.py", {}, cwd=tmp_path)
+    assert r1.returncode == 0
+    assert "pytest-fixture-feature" in r1.stdout
+    assert not checkpoint_file.exists(), "checkpoint must be consumed (deleted) after read"
 
-        r2 = _run("session_start.py", {})
-        assert r2.returncode == 0
-        assert "pytest-fixture-feature" not in r2.stdout
-    finally:
-        if backup is not None:
-            checkpoint_file.write_text(backup, encoding="utf-8")
-        elif checkpoint_file.is_file():
-            checkpoint_file.unlink()
+    r2 = _run("session_start.py", {}, cwd=tmp_path)
+    assert r2.returncode == 0
+    assert "pytest-fixture-feature" not in r2.stdout
 
 
-def test_session_start_no_checkpoint_is_silent():
-    checkpoint_file = ROOT / ".solocode" / "context-checkpoint.json"
-    assert not checkpoint_file.exists()  # sanity: previous test cleaned up
-    r = _run("session_start.py", {})
+def test_session_start_no_checkpoint_is_silent(tmp_path):
+    assert not (tmp_path / ".solocode" / "context-checkpoint.json").exists()
+    r = _run("session_start.py", {}, cwd=tmp_path)
     assert r.returncode == 0
     assert "Resuming from a PreCompact checkpoint" not in r.stdout
 
 
-def test_session_start_malformed_checkpoint_is_silent():
+def test_session_start_malformed_checkpoint_is_silent(tmp_path):
     """A corrupt/malformed checkpoint file must never crash SessionStart —
     advisory only. It's still consumed (deleted) so it doesn't linger."""
-    checkpoint_file = ROOT / ".solocode" / "context-checkpoint.json"
-    backup = checkpoint_file.read_text(encoding="utf-8") if checkpoint_file.is_file() else None
-    try:
-        checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint_file.write_text("not-json{{{", encoding="utf-8")
-        r = _run("session_start.py", {})
-        assert r.returncode == 0
-        assert "Resuming from a PreCompact checkpoint" not in r.stdout
-    finally:
-        if backup is not None:
-            checkpoint_file.write_text(backup, encoding="utf-8")
-        elif checkpoint_file.is_file():
-            checkpoint_file.unlink()
+    checkpoint_file = tmp_path / ".solocode" / "context-checkpoint.json"
+    checkpoint_file.parent.mkdir(parents=True)
+    checkpoint_file.write_text("not-json{{{", encoding="utf-8")
+
+    r = _run("session_start.py", {}, cwd=tmp_path)
+    assert r.returncode == 0
+    assert "Resuming from a PreCompact checkpoint" not in r.stdout
+    assert not checkpoint_file.exists()
 
 
 def _load_session_start():
